@@ -70,7 +70,7 @@ public class DamageEmpowerSpell extends BuffSpell {
 
         CastData data = entities.get(caster.getUniqueId());
         float dmgM = this.damageMultiplier * data.power();
-                //this.damageMultiplier.get(caster, event.getTarget(), data.power(), data.args());
+        this.damageMultiplier = dmgM;
         event.applyDamageModifier(dmgM);
     }
 

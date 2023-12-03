@@ -6,7 +6,7 @@
 
     <groupId>fr.soraxdubbing</groupId>
     <artifactId>FutureSpells</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.5-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>FutureSpells</name>
@@ -62,6 +62,10 @@
             <id>sonatype</id>
             <url>https://oss.sonatype.org/content/groups/public/</url>
         </repository>
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+        </repository>
     </repositories>
 
     <dependencies>
@@ -72,11 +76,15 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>com.nisovin</groupId>
-            <artifactId>magicspells</artifactId>
-            <version>3.6</version>
-            <scope>system</scope>
-            <systemPath>${project.basedir}/src/main/resources/MagicSpells.jar</systemPath>
+            <groupId>com.github.TheComputerGeek2</groupId>
+            <artifactId>MagicSpells</artifactId>
+            <version>3.5-Release</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.github.Electroid</groupId>
+            <artifactId>intake</artifactId>
+            <version>491a0c520fd2c0c0caabaeef90d64e3b65f270dd</version>
         </dependency>
     </dependencies>
 </project>

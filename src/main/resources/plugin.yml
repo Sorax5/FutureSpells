@@ -3,3 +3,5 @@ version: '${project.version}'
 main: fr.soraxdubbing.futurespells.FutureSpells
 authors: [ SoraxDubbing ]
 description: FutureSpells from future MagicSpell
+depend:
+  - MagicSpells
