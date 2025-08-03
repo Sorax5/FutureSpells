@@ -10,6 +10,7 @@ import com.nisovin.magicspells.mana.ManaHandler;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 @CommandAlias("chakra|cha|ck")
@@ -40,7 +41,7 @@ public class ManaCommands extends BaseCommand {
             throw e;
         }
         catch (Exception e) {
-            logger.severe("An error occurred while setting mana: " + e.getMessage());
+            logger.log(Level.SEVERE, "An error occurred while setting mana for player " + target.getPlayer().getName(), e);
             throw new InvalidCommandArgument("An error occurred while setting mana. Please check the console for more details.");
         }
     }
@@ -74,7 +75,7 @@ public class ManaCommands extends BaseCommand {
             throw e;
         }
         catch (Exception e) {
-            logger.severe("An error occurred while adding mana: " + e.getMessage());
+            logger.log(Level.SEVERE, "An error occurred while adding mana for player " + target.getPlayer().getName(), e);
             throw new InvalidCommandArgument("An error occurred while adding mana. Please check the console for more details.");
         }
     }
@@ -108,7 +109,7 @@ public class ManaCommands extends BaseCommand {
             throw e;
         }
         catch (Exception e) {
-            logger.severe("An error occurred while removing mana: " + e.getMessage());
+            logger.log(Level.SEVERE, "An error occurred while removing mana for player " + target.getPlayer().getName(), e);
             throw new InvalidCommandArgument("An error occurred while removing mana. Please check the console for more details.");
         }
     }

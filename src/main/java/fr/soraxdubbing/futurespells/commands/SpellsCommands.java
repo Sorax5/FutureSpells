@@ -10,6 +10,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import java.util.Arrays;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 @CommandAlias("spells|spell|sp")
@@ -39,7 +40,7 @@ public class SpellsCommands extends BaseCommand {
             throw e;
         }
         catch (Exception e) {
-            logger.severe("An error occurred while executing the forcecast command: " + e.getMessage());
+            logger.log(Level.WARNING, "SpellsCommands failed to force cast " + spell.getName(), e);
             throw new IllegalArgumentException("An error occurred while executing the command. Please check the console for more details.");
         }
     }
