@@ -12,21 +12,27 @@ import com.nisovin.magicspells.util.TimeUtil;
 import com.nisovin.magicspells.util.compat.EventUtil;
 import fr.soraxdubbing.futurespells.logic.ManaPlayer;
 import fr.soraxdubbing.futurespells.logic.ManaPlayerManager;
+import fr.soraxdubbing.futurespells.utils.Tick;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class PersistentManaHandler extends ManaHandler {
 
     private final ManaPlayerManager manaPlayerManager;
+    private final Logger logger;
+
+    private Duration regenDuration;
 
     private String manaBarPrefix;
     private int manaBarSize;
@@ -34,7 +40,6 @@ public class PersistentManaHandler extends ManaHandler {
     private ChatColor manaBarColorEmpty;
     private final int manaBarToolSlot;
 
-    private int regenInterval;
     private int defaultStartingMana;
     private final int defaultMaxMana;
     private final int defaultRegenAmount;
@@ -50,9 +55,10 @@ public class PersistentManaHandler extends ManaHandler {
 
     private int taskId = -1;
 
-    public PersistentManaHandler(ManaPlayerManager manaPlayerManager, MagicConfig config) {
+    public PersistentManaHandler(ManaPlayerManager manaPlayerManager, MagicConfig config,Logger logger) {
 
         this.manaPlayerManager = manaPlayerManager;
+        this.logger = logger;
 
         this.manaBarPrefix = config.getString("mana.mana-bar-prefix", "Mana:");
         this.manaBarSize = config.getInt("mana.mana-bar-size", 35);
@@ -60,7 +66,8 @@ public class PersistentManaHandler extends ManaHandler {
         this.manaBarColorEmpty = ChatColor.getByChar(config.getString("mana.color-empty", ChatColor.BLACK.getChar() + ""));
         this.manaBarToolSlot = config.getInt("mana.tool-slot", 8);
 
-        this.regenInterval = config.getInt("mana.regen-interval", TimeUtil.TICKS_PER_SECOND);
+        this.regenDuration = Tick.toDuration(config.getInt("mana.regen-interval", TimeUtil.TICKS_PER_SECOND));
+
         this.defaultMaxMana = config.getInt("mana.default-max-mana", 100);
         this.defaultStartingMana = config.getInt("mana.default-starting-mana", this.defaultMaxMana);
         this.defaultRegenAmount = config.getInt("mana.default-regen-amount", 5);
@@ -73,11 +80,14 @@ public class PersistentManaHandler extends ManaHandler {
 
         modifierList = config.getStringList("mana.modifiers", null);
 
-        this.taskId = MagicSpells.scheduleRepeatingTask(new Runnable() {
-            @Override
-            public void run() {
-                for (ManaPlayer manaPlayer : manaPlayerManager.getManaPlayers()) {
-                    if(manaPlayer.getMana() < manaPlayer.getMaxMana()) {
+        this.taskId = MagicSpells.scheduleRepeatingTask(this::regenTask, Tick.fromDuration(regenDuration), Tick.fromDuration(regenDuration));
+    }
+
+    private void regenTask(){
+        try {
+            manaPlayerManager.getManaPlayers().stream()
+                    .filter(manaPlayer ->  manaPlayer.getMana() < manaPlayer.getMaxMana())
+                    .forEach(manaPlayer -> {
                         Player player = Bukkit.getPlayer(manaPlayer.getUuid());
                         int oldMana = manaPlayer.getMana();
                         manaPlayer.setMana(manaPlayer.getMana() + manaPlayer.getRegenAmount());
@@ -85,41 +95,58 @@ public class PersistentManaHandler extends ManaHandler {
                         ManaChangeEvent event = new ManaChangeEvent(player, oldMana, manaPlayer.getMana(), manaPlayer.getRegenAmount(), ManaChangeReason.REGEN);
                         EventUtil.call(event);
                         showMana(player, showManaOnRegen);
-                    }
-                }
-            }
-        }, this.regenInterval, this.regenInterval);
+                    });
+        }
+        catch (Exception e) {
+            logger.log(Level.SEVERE, "Error during mana regeneration task", e);
+        }
     }
-
 
     @Override
     public void initialize() {
-        if (modifierList != null && !modifierList.isEmpty()) {
+        try {
+            if (modifierList == null || modifierList.isEmpty()) {
+                return;
+            }
+
             MagicSpells.debug(2, "Adding mana modifiers: " + modifierList);
             modifiers = new ModifierSet(this.modifierList);
             modifierList = null;
+        }
+        catch (Exception e) {
+            logger.log(Level.SEVERE, "Could not initialize persistent mana handler", e);
         }
     }
 
     @Override
     public void createManaBar(Player player) {
-        ManaPlayer manaPlayer = manaPlayerManager.getManaPlayer(player.getUniqueId().toString());
+        try {
+            ManaPlayer manaPlayer = manaPlayerManager.getManaPlayer(player.getUniqueId().toString());
 
-        if (manaPlayer == null) {
-            manaPlayer = new ManaPlayer(player.getUniqueId(), defaultMaxMana, this.defaultRegenAmount);
-            manaPlayerManager.addManaPlayer(manaPlayer);
+            if (manaPlayer == null) {
+                manaPlayer = new ManaPlayer(player.getUniqueId(), defaultMaxMana, this.defaultRegenAmount);
+                manaPlayerManager.addManaPlayer(manaPlayer);
+            }
+
+            MagicSpells.scheduleDelayedTask(() -> showMana(player), 11);
         }
-
-        MagicSpells.scheduleDelayedTask(() -> showMana(player), 11);
+        catch (Exception e) {
+            logger.log(Level.SEVERE, "Error while creating mana bar for player " + player.getName(), e);
+        }
     }
 
     @Override
     public boolean updateManaRankIfNecessary(Player player) {
-        ManaPlayer manaPlayer = manaPlayerManager.getManaPlayer(player.getUniqueId().toString());
+        try {
+            ManaPlayer manaPlayer = manaPlayerManager.getManaPlayer(player.getUniqueId().toString());
 
-        if (manaPlayer == null) {
-            manaPlayer = new ManaPlayer(player.getUniqueId(), defaultMaxMana, this.defaultRegenAmount);
-            manaPlayerManager.addManaPlayer(manaPlayer);
+            if (manaPlayer == null) {
+                manaPlayer = new ManaPlayer(player.getUniqueId(), defaultMaxMana, this.defaultRegenAmount);
+                manaPlayerManager.addManaPlayer(manaPlayer);
+            }
+        }
+        catch (Exception e) {
+            logger.log(Level.SEVERE, "Error while updating mana rank for player " + player.getName(), e);
         }
 
         return false;
@@ -127,99 +154,142 @@ public class PersistentManaHandler extends ManaHandler {
 
     @Override
     public int getMaxMana(Player player) {
-        ManaPlayer manaPlayer = manaPlayerManager.getManaPlayer(player.getUniqueId().toString());
+        try {
+            ManaPlayer manaPlayer = manaPlayerManager.getManaPlayer(player.getUniqueId().toString());
 
-        if (manaPlayer == null) {
-            manaPlayer = new ManaPlayer(player.getUniqueId(), defaultMaxMana, this.defaultRegenAmount);
-            manaPlayerManager.addManaPlayer(manaPlayer);
+            if (manaPlayer == null) {
+                manaPlayer = new ManaPlayer(player.getUniqueId(), defaultMaxMana, this.defaultRegenAmount);
+                manaPlayerManager.addManaPlayer(manaPlayer);
+            }
+
+            return manaPlayer.getMaxMana();
+        }
+        catch (Exception e) {
+            logger.log(Level.SEVERE, "Error while getting max mana for player " + player.getName(), e);
         }
 
-        return manaPlayer.getMaxMana();
+        return defaultMaxMana;
     }
 
     @Override
     public void setMaxMana(Player player, int i) {
-        ManaPlayer manaPlayer = manaPlayerManager.getManaPlayer(player.getUniqueId().toString());
+        try {
+            ManaPlayer manaPlayer = manaPlayerManager.getManaPlayer(player.getUniqueId().toString());
 
-        if (manaPlayer == null) {
-            manaPlayer = new ManaPlayer(player.getUniqueId(), defaultMaxMana, this.defaultRegenAmount);
-            manaPlayerManager.addManaPlayer(manaPlayer);
+            if (manaPlayer == null) {
+                manaPlayer = new ManaPlayer(player.getUniqueId(), defaultMaxMana, this.defaultRegenAmount);
+                manaPlayerManager.addManaPlayer(manaPlayer);
+            }
+            manaPlayer.setMaxMana(i);
+            manaPlayerManager.updateManaPlayer(manaPlayer);
         }
-        manaPlayer.setMaxMana(i);
-        manaPlayerManager.updateManaPlayer(manaPlayer);
+        catch (Exception e) {
+            logger.log(Level.SEVERE, "Error while setting max mana for player " + player.getName(), e);
+        }
     }
 
     @Override
     public int getRegenAmount(Player player) {
-        ManaPlayer manaPlayer = manaPlayerManager.getManaPlayer(player.getUniqueId().toString());
+        try {
+            ManaPlayer manaPlayer = manaPlayerManager.getManaPlayer(player.getUniqueId().toString());
 
-        if (manaPlayer == null) {
-            manaPlayer = new ManaPlayer(player.getUniqueId(), defaultMaxMana, this.defaultRegenAmount);
-            manaPlayerManager.addManaPlayer(manaPlayer);
+            if (manaPlayer == null) {
+                manaPlayer = new ManaPlayer(player.getUniqueId(), defaultMaxMana, this.defaultRegenAmount);
+                manaPlayerManager.addManaPlayer(manaPlayer);
+            }
+
+
+            return manaPlayer.getRegenAmount();
+        }
+        catch (Exception e) {
+            logger.log(Level.SEVERE, "Error while getting regen amount for player " + player.getName(), e);
         }
 
-
-        return manaPlayer.getRegenAmount();
+        return defaultRegenAmount;
     }
 
     @Override
     public void setRegenAmount(Player player, int i) {
-        ManaPlayer manaPlayer = manaPlayerManager.getManaPlayer(player.getUniqueId().toString());
+        try {
+            ManaPlayer manaPlayer = manaPlayerManager.getManaPlayer(player.getUniqueId().toString());
 
-        if (manaPlayer == null) {
-            manaPlayer = new ManaPlayer(player.getUniqueId(), defaultMaxMana, this.defaultRegenAmount);
-            manaPlayerManager.addManaPlayer(manaPlayer);
+            if (manaPlayer == null) {
+                manaPlayer = new ManaPlayer(player.getUniqueId(), defaultMaxMana, this.defaultRegenAmount);
+                manaPlayerManager.addManaPlayer(manaPlayer);
+            }
+
+
+            manaPlayer.setRegenAmount(i);
+            manaPlayerManager.updateManaPlayer(manaPlayer);
+            this.showMana(player, showManaOnUse);
         }
-
-
-        manaPlayer.setRegenAmount(i);
-        manaPlayerManager.updateManaPlayer(manaPlayer);
-        this.showMana(player, showManaOnUse);
+        catch (Exception e) {
+            logger.log(Level.SEVERE, "Error while setting regen amount for player " + player.getName(), e);
+        }
     }
 
     @Override
     public int getMana(Player player) {
-        ManaPlayer manaPlayer = manaPlayerManager.getManaPlayer(player.getUniqueId().toString());
+        try {
+            ManaPlayer manaPlayer = manaPlayerManager.getManaPlayer(player.getUniqueId().toString());
 
-        if (manaPlayer == null) {
-            manaPlayer = new ManaPlayer(player.getUniqueId(), defaultMaxMana, this.defaultRegenAmount);
-            manaPlayerManager.addManaPlayer(manaPlayer);
+            if (manaPlayer == null) {
+                manaPlayer = new ManaPlayer(player.getUniqueId(), defaultMaxMana, this.defaultRegenAmount);
+                manaPlayerManager.addManaPlayer(manaPlayer);
+            }
+
+            return manaPlayer.getMana();
+        }
+        catch (Exception e) {
+            logger.log(Level.SEVERE, "Error while getting mana for player " + player.getName(), e);
         }
 
-        return manaPlayer.getMana();
+        return defaultStartingMana;
     }
 
     @Override
     public boolean hasMana(Player player, int i) {
-        ManaPlayer manaPlayer = manaPlayerManager.getManaPlayer(player.getUniqueId().toString());
+        try {
+            ManaPlayer manaPlayer = manaPlayerManager.getManaPlayer(player.getUniqueId().toString());
 
-        if (manaPlayer == null) {
-            manaPlayer = new ManaPlayer(player.getUniqueId(), defaultMaxMana, this.defaultRegenAmount);
-            manaPlayerManager.addManaPlayer(manaPlayer);
+            if (manaPlayer == null) {
+                manaPlayer = new ManaPlayer(player.getUniqueId(), defaultMaxMana, this.defaultRegenAmount);
+                manaPlayerManager.addManaPlayer(manaPlayer);
+            }
+
+            return manaPlayer.getMana() >= i;
+        }
+        catch (Exception e) {
+            logger.log(Level.SEVERE, "Error while checking mana for player " + player.getName(), e);
         }
 
-        return manaPlayer.getMana() >= i;
+        return false;
     }
 
     @Override
     public boolean removeMana(Player player, int i, ManaChangeReason manaChangeReason) {
-        ManaPlayer manaPlayer = manaPlayerManager.getManaPlayer(player.getUniqueId().toString());
+        try {
+            ManaPlayer manaPlayer = manaPlayerManager.getManaPlayer(player.getUniqueId().toString());
 
-        if (manaPlayer == null) {
-            manaPlayer = new ManaPlayer(player.getUniqueId(), defaultMaxMana, this.defaultRegenAmount);
-            manaPlayerManager.addManaPlayer(manaPlayer);
+            if (manaPlayer == null) {
+                manaPlayer = new ManaPlayer(player.getUniqueId(), defaultMaxMana, this.defaultRegenAmount);
+                manaPlayerManager.addManaPlayer(manaPlayer);
+            }
+
+            int oldMana = manaPlayer.getMana();
+
+            if (manaPlayer.getMana() >= i) {
+                manaPlayer.setMana(manaPlayer.getMana() - i);
+                manaPlayerManager.updateManaPlayer(manaPlayer);
+
+                ManaChangeEvent event = new ManaChangeEvent(player, oldMana, manaPlayer.getMana(), manaPlayer.getMaxMana(), manaChangeReason);
+                EventUtil.call(event);
+                this.showMana(player, showManaOnUse);
+                return true;
+            }
         }
-
-        int oldMana = manaPlayer.getMana();
-
-        if (manaPlayer.getMana() >= i) {
-            manaPlayer.setMana(manaPlayer.getMana() - i);
-            manaPlayerManager.updateManaPlayer(manaPlayer);
-
-            ManaChangeEvent event = new ManaChangeEvent(player, oldMana, manaPlayer.getMana(), manaPlayer.getMaxMana(), manaChangeReason);
-            EventUtil.call(event);
-            this.showMana(player, showManaOnUse);
-            return true;
+        catch (Exception e) {
+            logger.log(Level.SEVERE, "Error while removing mana for player " + player.getName(), e);
         }
 
         return false;
@@ -227,23 +297,28 @@ public class PersistentManaHandler extends ManaHandler {
 
     @Override
     public boolean addMana(Player player, int i, ManaChangeReason manaChangeReason) {
-        ManaPlayer manaPlayer = manaPlayerManager.getManaPlayer(player.getUniqueId().toString());
+        try {
+            ManaPlayer manaPlayer = manaPlayerManager.getManaPlayer(player.getUniqueId().toString());
 
-        if (manaPlayer == null) {
-            manaPlayer = new ManaPlayer(player.getUniqueId(), defaultMaxMana, this.defaultRegenAmount);
-            manaPlayerManager.addManaPlayer(manaPlayer);
+            if (manaPlayer == null) {
+                manaPlayer = new ManaPlayer(player.getUniqueId(), defaultMaxMana, this.defaultRegenAmount);
+                manaPlayerManager.addManaPlayer(manaPlayer);
+            }
+
+            int oldMana = manaPlayer.getMana();
+
+            if (manaPlayer.getMana() + i <= manaPlayer.getMaxMana()) {
+                manaPlayer.setMana(manaPlayer.getMana() + i);
+                manaPlayerManager.updateManaPlayer(manaPlayer);
+
+                ManaChangeEvent event = new ManaChangeEvent(player, oldMana, manaPlayer.getMana(), manaPlayer.getMaxMana(), manaChangeReason);
+                EventUtil.call(event);
+                this.showMana(player, showManaOnUse);
+                return true;
+            }
         }
-
-        int oldMana = manaPlayer.getMana();
-
-        if (manaPlayer.getMana() + i <= manaPlayer.getMaxMana()) {
-            manaPlayer.setMana(manaPlayer.getMana() + i);
-            manaPlayerManager.updateManaPlayer(manaPlayer);
-
-            ManaChangeEvent event = new ManaChangeEvent(player, oldMana, manaPlayer.getMana(), manaPlayer.getMaxMana(), manaChangeReason);
-            EventUtil.call(event);
-            this.showMana(player, showManaOnUse);
-            return true;
+        catch (Exception e) {
+            logger.log(Level.SEVERE, "Error while adding mana for player " + player.getName(), e);
         }
 
         return false;
@@ -251,23 +326,28 @@ public class PersistentManaHandler extends ManaHandler {
 
     @Override
     public boolean setMana(Player player, int i, ManaChangeReason manaChangeReason) {
-        ManaPlayer manaPlayer = manaPlayerManager.getManaPlayer(player.getUniqueId().toString());
+        try {
+            ManaPlayer manaPlayer = manaPlayerManager.getManaPlayer(player.getUniqueId().toString());
 
-        if (manaPlayer == null) {
-            manaPlayer = new ManaPlayer(player.getUniqueId(), defaultMaxMana, this.defaultRegenAmount);
-            manaPlayerManager.addManaPlayer(manaPlayer);
+            if (manaPlayer == null) {
+                manaPlayer = new ManaPlayer(player.getUniqueId(), defaultMaxMana, this.defaultRegenAmount);
+                manaPlayerManager.addManaPlayer(manaPlayer);
+            }
+
+            int oldMana = manaPlayer.getMana();
+
+            if (i <= manaPlayer.getMaxMana()) {
+                manaPlayer.setMana(i);
+                manaPlayerManager.updateManaPlayer(manaPlayer);
+
+                ManaChangeEvent event = new ManaChangeEvent(player, oldMana, manaPlayer.getMana(), manaPlayer.getMaxMana(), manaChangeReason);
+                EventUtil.call(event);
+                this.showMana(player, showManaOnUse);
+                return true;
+            }
         }
-
-        int oldMana = manaPlayer.getMana();
-
-        if (i <= manaPlayer.getMaxMana()) {
-            manaPlayer.setMana(i);
-            manaPlayerManager.updateManaPlayer(manaPlayer);
-
-            ManaChangeEvent event = new ManaChangeEvent(player, oldMana, manaPlayer.getMana(), manaPlayer.getMaxMana(), manaChangeReason);
-            EventUtil.call(event);
-            this.showMana(player, showManaOnUse);
-            return true;
+        catch (Exception e) {
+            logger.log(Level.SEVERE, "Error while setting mana for player " + player.getName(), e);
         }
 
         return false;
@@ -275,42 +355,47 @@ public class PersistentManaHandler extends ManaHandler {
 
     @Override
     public void showMana(Player player, boolean showInChat) {
-        ManaPlayer manaPlayer = manaPlayerManager.getManaPlayer(player.getUniqueId().toString());
+        try {
+            ManaPlayer manaPlayer = manaPlayerManager.getManaPlayer(player.getUniqueId().toString());
 
-        if (manaPlayer == null) {
-            manaPlayer = new ManaPlayer(player.getUniqueId(), defaultMaxMana, this.defaultRegenAmount);
+            if (manaPlayer == null) {
+                manaPlayer = new ManaPlayer(player.getUniqueId(), defaultMaxMana, this.defaultRegenAmount);
+            }
+
+            if(showInChat) {
+                showManaInChat(player, manaPlayer);
+            }
+
+            if(showManaOnWoodTool) {
+                showManaOnWoodTool(player, manaPlayer);
+            }
+
+            if(showManaOnHungerBar) {
+                showManaOnHungerBar(player, manaPlayer);
+            }
+
+            if(showManaOnExperienceBar) {
+                showManaOnExperienceBar(player, manaPlayer);
+            }
         }
-
-        if(showInChat) {
-            showManaInChat(player, manaPlayer);
-        }
-
-        if(showManaOnWoodTool) {
-            showManaOnWoodTool(player, manaPlayer);
-        }
-
-        if(showManaOnHungerBar) {
-            showManaOnHungerBar(player, manaPlayer);
-        }
-
-        if(showManaOnExperienceBar) {
-            showManaOnExperienceBar(player, manaPlayer);
+        catch (Exception e) {
+            logger.log(Level.SEVERE, "Error while showing mana for player " + player.getName(), e);
         }
     }
 
     private void showManaInChat(Player player, ManaPlayer bar) {
         int segments = (int)(((double)bar.getMana()/(double)bar.getMaxMana()) * this.manaBarSize);
-        String text = MagicSpells.getTextColor() + manaBarPrefix + " {" + this.manaBarColorFull;
+        StringBuilder text = new StringBuilder(MagicSpells.getTextColor() + manaBarPrefix + " {" + this.manaBarColorFull);
         int i = 0;
         for (; i < segments; i++) {
-            text += "=";
+            text.append("=");
         }
-        text += this.manaBarColorEmpty;
+        text.append(this.manaBarColorEmpty);
         for (; i < this.manaBarSize; i++) {
-            text += "=";
+            text.append("=");
         }
-        text += MagicSpells.getTextColor() + "} [" + bar.getMana() + '/' + bar.getMaxMana() + ']';
-        player.sendMessage(text);
+        text.append(MagicSpells.getTextColor()).append("} [").append(bar.getMana()).append('/').append(bar.getMaxMana()).append(']');
+        player.sendMessage(text.toString());
     }
 
     private void showManaOnWoodTool(Player player, ManaPlayer bar) {
@@ -341,12 +426,24 @@ public class PersistentManaHandler extends ManaHandler {
 
     @Override
     public void turnOff() {
-        manaPlayerManager.saveAll();
-        MagicSpells.cancelTask(this.taskId);
+        try {
+            manaPlayerManager.saveAll();
+            MagicSpells.cancelTask(this.taskId);
+        }
+        catch (Exception e) {
+            logger.log(Level.SEVERE, "Error while turning off PersistentManaHandler", e);
+        }
     }
 
     @Override
     public ModifierSet getModifiers() {
-        return modifiers;
+        try {
+            return modifiers;
+        }
+        catch (Exception e) {
+            logger.log(Level.SEVERE, "Error while getting modifiers", e);
+        }
+
+        return new ModifierSet(new ArrayList<>());
     }
 }

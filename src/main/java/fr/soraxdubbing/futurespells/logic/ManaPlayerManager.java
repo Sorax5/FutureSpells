@@ -7,10 +7,10 @@ import java.util.logging.Logger;
 
 public class ManaPlayerManager {
     private final List<ManaPlayer> manaPlayers;
-    private final ManaPlayerDao manaPlayerDao;
+    private final ManaPlayerRepository manaPlayerDao;
     private Logger logger;
 
-    public ManaPlayerManager(ManaPlayerDao manaPlayerDao) {
+    public ManaPlayerManager(ManaPlayerRepository manaPlayerDao) {
         this.manaPlayerDao = manaPlayerDao;
         this.manaPlayers = manaPlayerDao.ReadAll();
         logger = FutureSpells.getInstance().getLogger();
@@ -54,7 +54,7 @@ public class ManaPlayerManager {
         return manaPlayers;
     }
 
-    public ManaPlayerDao getManaPlayerDao() {
+    public ManaPlayerRepository getManaPlayerDao() {
         return manaPlayerDao;
     }
 

@@ -1,5 +1,5 @@
 name: FutureSpells
-version: '${project.version}'
+version: '${version }'
 main: fr.soraxdubbing.futurespells.FutureSpells
 authors: [ SoraxDubbing ]
 description: FutureSpells from future MagicSpell

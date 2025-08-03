@@ -1,79 +1,105 @@
 package fr.soraxdubbing.futurespells;
 
-import app.ashcon.intake.bukkit.BukkitIntake;
-import app.ashcon.intake.bukkit.graph.BasicBukkitCommandGraph;
-import app.ashcon.intake.fluent.DispatcherNode;
+import co.aikar.commands.PaperCommandManager;
 import com.nisovin.magicspells.MagicSpells;
+import com.nisovin.magicspells.Spell;
 import com.nisovin.magicspells.events.MagicSpellsLoadedEvent;
-import fr.soraxdubbing.futurespells.command.ManaCommands;
-import fr.soraxdubbing.futurespells.command.SpellsCommands;
-import fr.soraxdubbing.futurespells.command.providers.MagicSpellsModule;
+import com.nisovin.magicspells.mana.ManaHandler;
 import fr.soraxdubbing.futurespells.logic.ManaPlayerManager;
-import fr.soraxdubbing.futurespells.storage.JsonManaPlayerDao;
+import fr.soraxdubbing.futurespells.commands.ManaCommands;
+import fr.soraxdubbing.futurespells.commands.SpellsCommands;
+import fr.soraxdubbing.futurespells.storage.JsonManaPlayerRepository;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.io.File;
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
+
 public final class FutureSpells extends JavaPlugin implements Listener {
 
     private static FutureSpells instance;
 
     private ManaPlayerManager manaPlayerManager;
-
-    @Override
-    public void onLoad() {
-        BasicBukkitCommandGraph cmdGraph = new BasicBukkitCommandGraph(new MagicSpellsModule());
-
-        DispatcherNode chakra = cmdGraph.getRootDispatcherNode().registerNode("chakra");
-        chakra.registerCommands(new ManaCommands());
-
-        DispatcherNode spells = cmdGraph.getRootDispatcherNode().registerNode("spells");
-        spells.registerCommands(new SpellsCommands());
-
-        // REGISTER COMMANDS
-        BukkitIntake bukkitIntake = new BukkitIntake(this, cmdGraph);
-        bukkitIntake.register();
-    }
+    private PaperCommandManager paperCommandManager;
+    private ManaHandler manaHandler;
 
     @Override
     public void onEnable() {
         instance = this;
 
-        if (!getDataFolder().exists()) {
-            getDataFolder().mkdir();
+        if (!getDataFolder().exists() && !getDataFolder().mkdirs()) {
+            getLogger().warning("[FutureSpells] Failed to create the directory!");
         }
 
-        getLogger().info("FutureSpells is loading...");
+        File manaFolder = new File(getDataFolder().getAbsolutePath(), "players");
 
-        // get manaHandler class name
-        getLogger().info("ManaHandler class name: " + MagicSpells.getManaHandler().getClass().getName());
-
-        manaPlayerManager = new ManaPlayerManager(new JsonManaPlayerDao(getDataFolder().getAbsolutePath() + "/players"));
-        PersistentManaHandler persistentManaHandler = new PersistentManaHandler(manaPlayerManager, MagicSpells.plugin.getMagicConfig());
-        MagicSpells.setManaHandler(persistentManaHandler);
-
-        getLogger().info("ManaHandler class name: " + MagicSpells.getManaHandler().getClass().getName());
-
-        this.getServer().getScheduler().scheduleSyncDelayedTask(this, () -> {
-            getLogger().info("ManaHandler class name: " + MagicSpells.getManaHandler().getClass().getName());
-        }, 20L);
+        manaPlayerManager = new ManaPlayerManager(new JsonManaPlayerRepository(manaFolder, getLogger()));
+        this.manaHandler = new PersistentManaHandler(manaPlayerManager, MagicSpells.plugin.getMagicConfig(), getLogger());
+        MagicSpells.setManaHandler(this.manaHandler);
 
         getServer().getPluginManager().registerEvents(this, this);
+        setupCommands();
     }
 
     @Override
     public void onDisable() {
-        // Plugin shutdown logic
         this.manaPlayerManager.saveAll();
+    }
+
+    private void setupCommands() {
+        paperCommandManager = new PaperCommandManager(this);
+        paperCommandManager.enableUnstableAPI("help");
+        paperCommandManager.registerDependency(ManaHandler.class, this.manaHandler);
+
+        paperCommandManager.getCommandCompletions().registerAsyncCompletion("spells", context -> {
+            try {
+                String spellName = context.getInput();
+
+                return MagicSpells.spells().stream()
+                        .map(Spell::getName)
+                        .filter(name -> name.toLowerCase().startsWith(spellName.toLowerCase()))
+                        .collect(Collectors.toList());
+            }
+            catch (Exception e) {
+                getLogger().severe("Error while completing spells: " + e.getMessage());
+                throw new IllegalArgumentException("Error while completing spells.");
+            }
+        });
+
+        paperCommandManager.getCommandContexts().registerContext(Spell.class, bukkitCommandExecutionContext -> {
+            try {
+                String spellName = bukkitCommandExecutionContext.popFirstArg();
+                Spell spell = MagicSpells.getSpellByInGameName(spellName);
+
+                if (spell == null) {
+                    spell = MagicSpells.getSpellByInternalName(spellName);
+                }
+
+                if (spell == null) {
+                    throw new IllegalArgumentException("Spell not found: " + spellName);
+                }
+
+                return spell;
+            }
+            catch (Exception e) {
+                getLogger().severe("Error while getting spell context: " + e.getMessage());
+                throw new IllegalArgumentException("Error while getting spell context.");
+            }
+        });
+
+        paperCommandManager.registerCommand(new ManaCommands());
+        paperCommandManager.registerCommand(new SpellsCommands());
     }
 
     @EventHandler
     public void OnMagicSpellsLoaded(MagicSpellsLoadedEvent event){
         getLogger().info("ManaHandler class name: " + MagicSpells.getManaHandler().getClass().getName());
 
-        PersistentManaHandler persistentManaHandler = new PersistentManaHandler(manaPlayerManager, MagicSpells.plugin.getMagicConfig());
+        PersistentManaHandler persistentManaHandler = new PersistentManaHandler(manaPlayerManager, MagicSpells.plugin.getMagicConfig(), getLogger());
         MagicSpells.setManaHandler(persistentManaHandler);
 
         this.getServer().getScheduler().scheduleSyncDelayedTask(this, () -> {
