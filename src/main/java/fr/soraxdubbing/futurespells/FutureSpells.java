@@ -37,7 +37,7 @@ public final class FutureSpells extends JavaPlugin implements Listener {
 
         File manaFolder = new File(getDataFolder().getAbsolutePath(), "players");
 
-        manaPlayerManager = new ManaPlayerManager(new JsonManaPlayerRepository(manaFolder, getLogger()));
+        manaPlayerManager = new ManaPlayerManager(new JsonManaPlayerRepository(manaFolder, getLogger()), getLogger());
         this.manaHandler = new PersistentManaHandler(manaPlayerManager, MagicSpells.plugin.getMagicConfig(), getLogger());
         MagicSpells.setManaHandler(this.manaHandler);
 
