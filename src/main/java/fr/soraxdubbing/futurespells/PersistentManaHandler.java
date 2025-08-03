@@ -3,10 +3,8 @@ package fr.soraxdubbing.futurespells;
 import com.nisovin.magicspells.MagicSpells;
 import com.nisovin.magicspells.castmodifiers.ModifierSet;
 import com.nisovin.magicspells.events.ManaChangeEvent;
-import com.nisovin.magicspells.mana.ManaBar;
 import com.nisovin.magicspells.mana.ManaChangeReason;
 import com.nisovin.magicspells.mana.ManaHandler;
-import com.nisovin.magicspells.mana.ManaRank;
 import com.nisovin.magicspells.util.MagicConfig;
 import com.nisovin.magicspells.util.TimeUtil;
 import com.nisovin.magicspells.util.compat.EventUtil;
@@ -21,9 +19,7 @@ import org.bukkit.inventory.ItemStack;
 
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -32,7 +28,7 @@ public class PersistentManaHandler extends ManaHandler {
     private final ManaPlayerManager manaPlayerManager;
     private final Logger logger;
 
-    private Duration regenDuration;
+    private Duration REGENERATION_DURATION;
 
     private String manaBarPrefix;
     private int manaBarSize;
@@ -66,7 +62,7 @@ public class PersistentManaHandler extends ManaHandler {
         this.manaBarColorEmpty = ChatColor.getByChar(config.getString("mana.color-empty", ChatColor.BLACK.getChar() + ""));
         this.manaBarToolSlot = config.getInt("mana.tool-slot", 8);
 
-        this.regenDuration = Tick.toDuration(config.getInt("mana.regen-interval", TimeUtil.TICKS_PER_SECOND));
+        this.REGENERATION_DURATION = Tick.toDuration(config.getInt("mana.regen-interval", TimeUtil.TICKS_PER_SECOND));
 
         this.defaultMaxMana = config.getInt("mana.default-max-mana", 100);
         this.defaultStartingMana = config.getInt("mana.default-starting-mana", this.defaultMaxMana);
@@ -80,7 +76,7 @@ public class PersistentManaHandler extends ManaHandler {
 
         modifierList = config.getStringList("mana.modifiers", null);
 
-        this.taskId = MagicSpells.scheduleRepeatingTask(this::regenTask, Tick.fromDuration(regenDuration), Tick.fromDuration(regenDuration));
+        this.taskId = MagicSpells.scheduleRepeatingTask(this::regenTask, Tick.fromDuration(REGENERATION_DURATION), Tick.fromDuration(REGENERATION_DURATION));
     }
 
     private void regenTask(){
