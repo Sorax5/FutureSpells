@@ -9,6 +9,7 @@ import com.nisovin.magicspells.Spell;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
+import java.util.Arrays;
 import java.util.logging.Logger;
 
 @CommandAlias("spells|spell|sp")
@@ -21,10 +22,17 @@ public class SpellsCommands extends BaseCommand {
     @Syntax("<player> <spell> [args...]")
     @CommandCompletion("@players @spells")
     @CommandPermission("futurespells.forcecast")
-    public void forceCast(CommandSender sender, OnlinePlayer target, Spell spell, @Split(" ") @Default("") String[] args) {
+    public void forceCast(CommandSender sender, OnlinePlayer target, Spell spell, @Optional String args) {
         try {
             Player player = target.getPlayer();
-            spell.cast(player, args);
+
+            if (args == null) {
+                args = "";
+            }
+
+            String[] argsArray = args.split(" ");
+
+            spell.cast(player, argsArray);
             sender.sendMessage("§bPlayer " + player.getName() + " forced to cast " + spell.getName());
         }
         catch (InvalidCommandArgument e) {
