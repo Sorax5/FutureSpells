@@ -23,6 +23,7 @@ public class InventoryOpenListener extends PassiveListener {
 
     private final List<PassiveSpell> passiveSpells = new ArrayList<>();
     private final Set<String> inventoryNames = new HashSet<>();
+
     private static final Logger logger = FutureSpells.getInstance().getLogger();
 
     @Override
@@ -54,7 +55,11 @@ public class InventoryOpenListener extends PassiveListener {
             String openedInventoryNameLower = openedInventoryName.toLowerCase();
             passiveSpells.stream()
                     .filter(playerSpellbook::hasSpell)
-                    .filter(passiveSpell -> inventoryNames.isEmpty() || inventoryNames.contains(openedInventoryNameLower))
+                    .filter(passiveSpell ->
+                            inventoryNames.isEmpty()
+                            || inventoryNames.contains(openedInventoryNameLower)
+                            || player.getInventory().getName().equalsIgnoreCase(openedInventoryNameLower)
+                    )
                     .forEach(passiveSpell -> passiveSpell.activate(player));
         } catch (Exception e) {
             logger.log(Level.WARNING, "Erreur dans InventoryOpenListener pour le joueur " + event.getPlayer().getName(), e);

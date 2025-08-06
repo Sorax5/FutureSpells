@@ -61,7 +61,11 @@ public class InventoryCloseListener extends PassiveListener {
             String closedInventoryNameLower = closedInventoryName.toLowerCase();
             spells.stream()
                     .filter(playerSpellbook::hasSpell)
-                    .filter(passiveSpell -> inventoryNames.isEmpty() || inventoryNames.contains(closedInventoryNameLower))
+                    .filter(passiveSpell ->
+                            inventoryNames.isEmpty()
+                                    || inventoryNames.contains(closedInventoryNameLower)
+                                    || player.getInventory().getName().equalsIgnoreCase(closedInventoryNameLower)
+                    )
                     .forEach(passiveSpell -> passiveSpell.activate(player));
         }
         catch (Exception e) {
