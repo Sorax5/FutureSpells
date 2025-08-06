@@ -14,6 +14,7 @@ import fr.soraxdubbing.futurespells.utils.Tick;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
@@ -83,6 +84,10 @@ public class PersistentManaHandler extends ManaHandler {
         try {
             manaPlayerManager.getManaPlayers().stream()
                     .filter(manaPlayer ->  manaPlayer.getMana() < manaPlayer.getMaxMana())
+                    .filter(manaPlayer -> {
+                        OfflinePlayer player = Bukkit.getOfflinePlayer(manaPlayer.getUuid());
+                        return player != null && player.isOnline();
+                    })
                     .forEach(manaPlayer -> {
                         Player player = Bukkit.getPlayer(manaPlayer.getUuid());
                         int oldMana = manaPlayer.getMana();

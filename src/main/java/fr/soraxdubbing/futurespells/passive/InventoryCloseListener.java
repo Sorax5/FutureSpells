@@ -7,6 +7,7 @@ import com.nisovin.magicspells.spells.passive.PassiveListener;
 import com.nisovin.magicspells.spells.passive.PassiveTrigger;
 import com.nisovin.magicspells.util.OverridePriority;
 import com.nisovin.magicspells.util.Util;
+import fr.soraxdubbing.futurespells.FutureSpells;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -16,35 +17,55 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class InventoryCloseListener extends PassiveListener {
 
-    List<PassiveSpell> spells = new ArrayList<PassiveSpell>();
+    private final List<PassiveSpell> spells = new ArrayList<PassiveSpell>();
     private final Set<String> inventoryNames = new HashSet<>();
 
-    @Override
-    public void registerSpell(PassiveSpell passiveSpell, PassiveTrigger passiveTrigger, String var) {
-        spells.add(passiveSpell);
-        if (var == null || var.isEmpty()) return;
+    private final static Logger logger = FutureSpells.getInstance().getLogger();
 
-        String[] split = var.split(",");
-        for (String s : split) {
-            inventoryNames.add(s.trim());
+    @Override
+    public void registerSpell(PassiveSpell passiveSpell, PassiveTrigger passiveTrigger, String inventoryNamesString) {
+        spells.add(passiveSpell);
+        if (inventoryNamesString == null || inventoryNamesString.isEmpty()) {
+            return;
+        }
+
+        String[] inventoryNamesArray = inventoryNamesString.split(",");
+        for (String inventoryName : inventoryNamesArray) {
+            this.inventoryNames.add(inventoryName.trim().toLowerCase());
         }
     }
 
-    @OverridePriority
+    /**
+     * Gère la fermeture d'un inventaire et active les sorts passifs associés si nécessaire.
+     * Les sorts sont activés si le joueur possède le sort et si le nom de l'inventaire correspond (ou si aucun nom n'est filtré).
+     */
     @EventHandler
     public void onInventoryClose(InventoryCloseEvent event) {
-        Player player = (Player) event.getPlayer();
-        Spellbook spellbook = MagicSpells.getSpellbook(player);
-
-        for (PassiveSpell spell : spells) {
-            if (spellbook.hasSpell(spell)) {
-                if(event.getInventory().getName() == event.getPlayer().getInventory().getName()){
-                    spell.activate(player);
-                }
+        try {
+            Player player = (Player) event.getPlayer();
+            Spellbook playerSpellbook = MagicSpells.getSpellbook(player);
+            if (playerSpellbook == null) {
+                return;
             }
+
+            String closedInventoryName = event.getInventory().getName();
+            if (closedInventoryName == null) {
+                return;
+            }
+
+            String closedInventoryNameLower = closedInventoryName.toLowerCase();
+            spells.stream()
+                    .filter(playerSpellbook::hasSpell)
+                    .filter(passiveSpell -> inventoryNames.isEmpty() || inventoryNames.contains(closedInventoryNameLower))
+                    .forEach(passiveSpell -> passiveSpell.activate(player));
+        }
+        catch (Exception e) {
+            logger.log(Level.WARNING, "Erreur dans InventoryCloseListener pour le joueur " + event.getPlayer().getName(), e);
         }
     }
 }

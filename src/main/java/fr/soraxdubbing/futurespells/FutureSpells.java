@@ -32,7 +32,7 @@ public final class FutureSpells extends JavaPlugin implements Listener {
         instance = this;
 
         if (!getDataFolder().exists() && !getDataFolder().mkdirs()) {
-            getLogger().warning("[FutureSpells] Failed to create the directory!");
+            getLogger().warning("Failed to create the directory!");
         }
 
         File manaFolder = new File(getDataFolder().getAbsolutePath(), "players");
@@ -54,6 +54,7 @@ public final class FutureSpells extends JavaPlugin implements Listener {
         paperCommandManager = new PaperCommandManager(this);
         paperCommandManager.enableUnstableAPI("help");
         paperCommandManager.registerDependency(ManaHandler.class, this.manaHandler);
+        paperCommandManager.registerDependency(ManaPlayerManager.class, this.manaPlayerManager);
 
         paperCommandManager.getCommandCompletions().registerAsyncCompletion("spells", context -> {
             try {

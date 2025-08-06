@@ -2,11 +2,14 @@ package fr.soraxdubbing.futurespells.commands;
 
 import co.aikar.commands.BaseCommand;
 import co.aikar.commands.CommandHelp;
+import co.aikar.commands.CommandManager;
 import co.aikar.commands.InvalidCommandArgument;
 import co.aikar.commands.annotation.*;
 import co.aikar.commands.bukkit.contexts.OnlinePlayer;
 import com.nisovin.magicspells.mana.ManaChangeReason;
 import com.nisovin.magicspells.mana.ManaHandler;
+import fr.soraxdubbing.futurespells.logic.ManaPlayer;
+import fr.soraxdubbing.futurespells.logic.ManaPlayerManager;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -18,6 +21,7 @@ public class ManaCommands extends BaseCommand {
 
     @Dependency private ManaHandler manaHandler;
     @Dependency private Logger logger;
+    @Dependency private ManaPlayerManager manaPlayerManager;
 
     @Subcommand("set")
     @Description("Set max mana to a player")
@@ -111,6 +115,28 @@ public class ManaCommands extends BaseCommand {
         catch (Exception e) {
             logger.log(Level.SEVERE, "An error occurred while removing mana for player " + target.getPlayer().getName(), e);
             throw new InvalidCommandArgument("An error occurred while removing mana. Please check the console for more details.");
+        }
+    }
+
+    @Subcommand("info")
+    @Description("Get mana information of a player")
+    @Syntax("<player>")
+    @CommandPermission("futurespells.mana.info")
+    public void info(CommandSender sender, OnlinePlayer target) {
+        try {
+            ManaPlayer manaPlayer = manaPlayerManager.getManaPlayer(target.getPlayer().getUniqueId().toString());
+            if (manaPlayer == null) {
+                throw new InvalidCommandArgument("Mana player not found for " + target.getPlayer().getName());
+            }
+
+            sender.sendMessage(manaPlayer.toString());
+        }
+        catch (InvalidCommandArgument e) {
+            throw e;
+        }
+        catch (Exception e) {
+            logger.log(Level.SEVERE, "An error occurred while retrieving mana information for player " + target.getPlayer().getName(), e);
+            throw new InvalidCommandArgument("An error occurred while retrieving mana information. Please check the console for more details.");
         }
     }
 

@@ -6,7 +6,7 @@ import java.util.UUID;
 /**
  * Stock the mana of a player
  */
-public class ManaPlayer implements Serializable {
+public class ManaPlayer {
     private final UUID uuid;
     private int mana;
     private int maxMana;
