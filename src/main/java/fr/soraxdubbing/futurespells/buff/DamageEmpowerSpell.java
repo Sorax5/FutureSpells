@@ -23,7 +23,7 @@ public class DamageEmpowerSpell extends BuffSpell {
 
     // Utilisation de ConcurrentHashMap pour la sécurité des threads
     private final Map<UUID, CastData> entities;
-    private static final Logger logger = FutureSpells.getInstance().getLogger();
+    private static final Logger logger = MagicSpells.getInstance().getLogger();
 
     private SpellFilter filter;
     private Float damageMultiplier;
