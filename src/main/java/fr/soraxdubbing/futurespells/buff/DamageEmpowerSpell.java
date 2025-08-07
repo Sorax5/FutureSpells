@@ -23,7 +23,6 @@ public class DamageEmpowerSpell extends BuffSpell {
 
     // Utilisation de ConcurrentHashMap pour la sécurité des threads
     private final Map<UUID, CastData> entities;
-    private static final Logger logger = MagicSpells.getInstance().getLogger();
 
     private SpellFilter filter;
     private Float damageMultiplier;
@@ -53,7 +52,7 @@ public class DamageEmpowerSpell extends BuffSpell {
         try {
             entities.put(player.getUniqueId(), new CastData(v, strings));
         } catch (Exception e) {
-            logger.log(Level.WARNING, "Erreur lors du cast de damage-empower-spell pour le joueur " + player.getName(), e);
+            FutureSpells.getInstance().getLogger().log(Level.WARNING, "Erreur lors du cast de damage-empower-spell pour le joueur " + player.getName(), e);
             return false;
         }
         return true;
@@ -84,7 +83,7 @@ public class DamageEmpowerSpell extends BuffSpell {
             entities.remove(player.getUniqueId());
         }
         catch (Exception e) {
-            logger.log(Level.WARNING, "Error in turning off damage-empower-spell for player " + player.getName(), e);
+            FutureSpells.getInstance().getLogger().log(Level.WARNING, "Error in turning off damage-empower-spell for player " + player.getName(), e);
         }
     }
 
@@ -123,7 +122,7 @@ public class DamageEmpowerSpell extends BuffSpell {
             event.applyDamageModifier(dmgM);
         }
         catch (Exception e) {
-            logger.log(Level.WARNING, "Error in handling SpellApplyDamageEvent for DamageEmpowerSpell", e);
+            FutureSpells.getInstance().getLogger().log(Level.WARNING, "Error in handling SpellApplyDamageEvent for DamageEmpowerSpell", e);
         }
     }
 
